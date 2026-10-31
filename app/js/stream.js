@@ -32,6 +32,7 @@
     window.addEventListener("message", onMessage);
     mount.appendChild(frame);
     return {
+      step: function () { return "waiting for the Neko page"; },
       unlock: function () {
         if (frame.contentWindow) frame.contentWindow.postMessage({ streamiso: true, type: "start" }, "*");
       },
@@ -64,6 +65,32 @@
     });
   }
 
+  // Ways to answer Neko's offer, in order. Chromium M69 defaults to the older "plan B" and may only know the
+  // older way of writing the data channel in an SDP.
+  var VARIANTS = [
+    { name: "unified-plan", semantics: "unified-plan", oldDataChannel: false },
+    { name: "plan-b", semantics: "plan-b", oldDataChannel: false },
+    { name: "old data channel", semantics: "unified-plan", oldDataChannel: true }
+  ];
+
+  function toOldDataChannel(sdp) {
+    return sdp
+      .replace(/a=extmap-allow-mixed\r?\n/g, "")
+      .replace(/a=max-message-size:\d+\r?\n/g, "")
+      .replace(/m=application (\d+) UDP\/DTLS\/SCTP webrtc-datachannel/, "m=application $1 DTLS/SCTP 5000")
+      .replace(/a=sctp-port:5000/, "a=sctpmap:5000 webrtc-datachannel 1024");
+  }
+
+  function toNewDataChannel(sdp) {
+    return sdp
+      .replace(/m=application (\d+) (?:UDP\/)?DTLS\/SCTP 5000/, "m=application $1 UDP/DTLS/SCTP webrtc-datachannel")
+      .replace(/a=sctpmap:5000 webrtc-datachannel \d+/, "a=sctp-port:5000");
+  }
+
+  function describe(error) {
+    return (error && error.name ? error.name + ": " : "") + (error && error.message ? error.message : String(error));
+  }
+
   function openClient(url, mount, events) {
     var parts = /^(https?):\/\/([^\/?#]+)/i.exec(url);
     var base = parts[1] + "://" + parts[2];
@@ -71,6 +98,7 @@
     var password = decodeURIComponent((/[?&]pwd=([^&]*)/.exec(url) || [])[1] || "");
     var socketBase = base.replace(/^http/i, "ws");
     var closed = false, ws = null, pc = null, token = null, legacy = false, reported = null;
+    var step = "signing in to Neko", variantAt = 0, errors = [], lastOffer = "", pendingCandidates = [];
 
     var video = document.createElement("video");
     video.autoplay = true;
@@ -96,43 +124,87 @@
       if (ws && ws.readyState === 1) ws.send(JSON.stringify(body));
     }
 
-    function onOffer(sdp) {
-      if (!pc) {
-        pc = new RTCPeerConnection({ iceServers: [], sdpSemantics: "unified-plan" });
-        pc.onicecandidate = function (e) {
-          if (!e.candidate) return;
-          if (legacy) send("signal/candidate", { data: JSON.stringify(e.candidate) });
-          else send("signal/candidate", e.candidate.toJSON());
-        };
-        pc.ontrack = function (e) {
-          // One stream for both tracks: assigning srcObject again would abort the pending play().
-          if (!video.srcObject) video.srcObject = new MediaStream();
-          video.srcObject.addTrack(e.track);
-          var played = video.play();
-          if (played && played.catch) played.catch(function () { /* unlock() tries again */ });
-        };
+    function createPeer(variant) {
+      var peer = new RTCPeerConnection({ iceServers: [], sdpSemantics: variant.semantics });
+      peer.onicecandidate = function (e) {
+        if (!e.candidate) return;
+        if (legacy) send("signal/candidate", { data: JSON.stringify(e.candidate) });
+        else send("signal/candidate", e.candidate.toJSON());
+      };
+      peer.oniceconnectionstatechange = function () {
+        step = "network: " + peer.iceConnectionState;
+      };
+      peer.ontrack = function (e) {
+        // One stream for both tracks: assigning srcObject again would abort the pending play().
+        if (!video.srcObject) video.srcObject = new MediaStream();
+        video.srcObject.addTrack(e.track);
+        var played = video.play();
+        if (played && played.catch) played.catch(function () { /* unlock() tries again */ });
+      };
+      return peer;
+    }
+
+    function addCandidate(candidate) {
+      pc.addIceCandidate(candidate).catch(function () { /* one bad candidate is not fatal */ });
+    }
+
+    // Tries each variant in turn. The offer stays valid on the server, so a new peer can answer it.
+    function tryNextVariant(problem) {
+      errors.push(VARIANTS[variantAt].name + ": " + problem);
+      if (pc) { try { pc.close(); } catch (e) { /* already closed */ } }
+      pc = null;
+      variantAt++;
+      if (variantAt < VARIANTS.length) negotiate(lastOffer);
+      else events.onError(errors.join("\n"));
+    }
+
+    function negotiate(sdp) {
+      lastOffer = sdp;
+      var variant = VARIANTS[variantAt];
+      var stage = "creating the connection";
+      try {
+        if (!pc) pc = createPeer(variant);
+      } catch (e) {
+        tryNextVariant(stage + ", " + describe(e));
+        return;
       }
-      pc.setRemoteDescription({ type: "offer", sdp: sdp }).then(function () {
-        return pc.createAnswer();
+      var peer = pc;
+      stage = step = "reading the offer";
+      peer.setRemoteDescription({ type: "offer", sdp: variant.oldDataChannel ? toOldDataChannel(sdp) : sdp }).then(function () {
+        pendingCandidates.splice(0).forEach(addCandidate);
+        stage = step = "creating the answer";
+        return peer.createAnswer();
       }).then(function (answer) {
-        return pc.setLocalDescription(answer);
+        stage = step = "applying the answer";
+        return peer.setLocalDescription(answer);
       }).then(function () {
-        if (legacy) send("signal/answer", { displayname: user, sdp: pc.localDescription.sdp });
-        else send("signal/answer", { sdp: pc.localDescription.sdp });
-      }).catch(function () { /* the player's timeout reports a stream that never starts */ });
+        step = "answer sent, waiting for the network";
+        var answer = peer.localDescription.sdp;
+        if (variant.oldDataChannel) answer = toNewDataChannel(answer);
+        if (legacy) send("signal/answer", { displayname: user, sdp: answer });
+        else send("signal/answer", { sdp: answer });
+      }).catch(function (e) {
+        if (!closed && peer === pc) tryNextVariant(stage + ", " + describe(e));
+      });
     }
 
     function connect(socketUrl) {
+      step = "connecting to Neko";
       ws = new WebSocket(socketUrl);
-      ws.onopen = function () { if (!legacy) send("signal/request", { video: {}, audio: {} }); };
+      ws.onopen = function () {
+        step = "waiting for the offer";
+        if (!legacy) send("signal/request", { video: {}, audio: {} });
+      };
       ws.onmessage = function (e) {
         var msg = JSON.parse(e.data);
         var data = legacy ? msg : (msg.payload || {});
         if (msg.event === "system/heartbeat") send("client/heartbeat", {});
-        else if (msg.event === "signal/provide" || msg.event === "signal/offer") onOffer(data.sdp);
-        else if (msg.event === "signal/candidate" && pc) {
+        else if (msg.event === "signal/provide" || msg.event === "signal/offer") negotiate(data.sdp);
+        else if (msg.event === "signal/candidate") {
           var candidate = legacy && typeof data.data === "string" ? JSON.parse(data.data) : data;
-          pc.addIceCandidate(candidate).catch(function () { /* one bad candidate is not fatal */ });
+          // A candidate can arrive before the offer has been read, and adding it then would fail.
+          if (pc && pc.remoteDescription) addCandidate(candidate);
+          else pendingCandidates.push(candidate);
         }
       };
     }
@@ -153,6 +225,7 @@
     });
 
     return {
+      step: function () { return step; },
       unlock: function () {
         video.muted = false;
         var played = video.play();

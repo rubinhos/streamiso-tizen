@@ -22,11 +22,14 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 |---|---|---|
 | Catalog | Move and open | Leave the app |
 | Settings | Move, OK to type | Return to the catalog |
-| DVD, bar closed | Go to the disc's menu | Open the bar |
+| DVD menu, bar closed | Go to the disc's menu | Open the bar |
+| DVD film, bar closed | Arrows go to the disc, OK opens the bar | Open the bar |
 | DVD, bar open | Move between the controls | Close the bar |
 | CD | Move through the tracks and controls | Return to the catalog |
 
 - The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu again. Info also opens it.
+- A menu is recognized by title 0 or no duration. Some menus report a duration, so for 5 seconds after an arrow, OK goes to
+  the disc even during what looks like the film.
 - The back arrow in the bar, or Stop, leaves a DVD.
 - **Progress line:** press Up from the buttons to reach it, then Left and Right to move. The jump happens when you stop
   pressing, or right away with OK. Holding the key moves faster.
@@ -41,8 +44,9 @@ The app picks one of two routes. **Settings** shows which one it is using.
 - **Built-in client** (a WebSocket, `RTCPeerConnection` and a `<video>`) on older engines. The current Neko page uses syntax
   (`?.`, `??`, `||=`) that Chromium M69 cannot parse.
 
-The built-in client reads Neko's login answer, which needs CORS on Neko. Without it the client falls back to Neko's older
-socket, which connected less reliably in testing. In the `neko` service of Streamiso's `docker-compose.yml`:
+The built-in client reads Neko's login answer. A 2020 TV read it without any setting on the server, but a desktop browser
+needs CORS on Neko. Without the answer the client falls back to Neko's older socket, which connected less reliably in
+testing. If you need it, in the `neko` service of Streamiso's `docker-compose.yml`:
 
 ```yaml
 NEKO_SERVER_CORS: "${CORS_ORIGIN:-}"
@@ -71,5 +75,7 @@ The focus stays in the app, which takes it back whenever the stream's page asks 
 7. **Typing the address:** does the keyboard open with OK, and does the focus return when you finish or cancel?
 8. **Screen saver:** leave a disc playing for longer than it takes to start.
 9. **Home button during a film:** it should pause. See what happens when you return.
-10. **Packaging and installing:** `config.xml` and the steps in the README have not been run.
-11. **A real Streamiso server:** the app itself has only run against the simulated one.
+
+
+**Seen on a 2020 TV (Tizen 5.5, Chromium M69):** the app installs and opens, and opens a disc on a real server. Its engine has
+`RTCPeerConnection`, and with the fallback variants in `stream.js` it completes the WebRTC connection with Neko.

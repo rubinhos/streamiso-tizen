@@ -1,5 +1,6 @@
 // The player. The same keys do different things depending on what is on screen:
-//   DVD, bar closed: arrows and OK go to the disc's menu through the API. Back or Info opens the bar.
+//   DVD, bar closed: arrows go to the disc's menu through the API. OK presses a menu's button, and during the
+//                    film it opens the bar. Back or Info always open the bar.
 //   DVD, bar open:   arrows move between the buttons. Back closes it, and so do a few seconds without a key.
 //   CD:              there is no video menu, so arrows move through the track list and the buttons.
 //                    Back leaves the player.
@@ -7,7 +8,7 @@
 (function (S) {
   "use strict";
 
-  var config = { readyTimeoutMs: 25000, barHideMs: 6000, pollMs: 1000, osdMs: 2500, idleGraceMs: 5000, startRetries: 20, soundCheckMs: 2000, scrubCommitMs: 600 };
+  var config = { readyTimeoutMs: 25000, barHideMs: 6000, pollMs: 1000, osdMs: 2500, idleGraceMs: 5000, startRetries: 20, soundCheckMs: 2000, scrubCommitMs: 600, navWindowMs: 5000 };
   var ARROWS = { left: 1, right: 1, up: 1, down: 1 };
   var SCRUB_RUN_MS = 700;
   var STATUS_SETTLE_MS = 300;
@@ -35,6 +36,14 @@
     });
   }
   function fire(action, value) { cmd(action, value).catch(function () { /* already shown */ }); }
+
+  // OK has to press the buttons of a disc's menu, and otherwise opens the bar. A menu usually reports title 0
+  // or no duration. Some have a duration, so OK also goes to the disc right after moving with the arrows.
+  function okGoesToDisc() {
+    var st = session.status;
+    if (!st || !st.length || st.title === 0) return true;
+    return Date.now() - session.lastNav < config.navWindowMs;
+  }
 
   // ------------------------------------------------------------- the bar (DVD)
   function bumpBar() {
@@ -288,11 +297,12 @@
     S.player.open(disc, resume);
   }
 
+  // The network is only worth blaming once the TV has answered the server's offer.
   function streamFailure() {
-    var engine = S.stream.mode() === "client" ? "the app's built-in client" : "the Neko page";
-    failure("The video did not start",
-      "The stream did not connect through " + engine + " in " + Math.round(config.readyTimeoutMs / 1000) + " seconds.\n" +
-      "Check SERVER_IP on the server and that UDP ports 52000-52100 are open.", reopen);
+    var step = session.stream && session.stream.step ? session.stream.step() : "";
+    var text = "No picture after " + Math.round(config.readyTimeoutMs / 1000) + " seconds. Last step: " + step + ".";
+    if (/network/.test(step)) text += "\nCheck SERVER_IP on the server and that UDP ports 52000-52100 are open.";
+    failure("The video did not start", text, reopen);
   }
 
   // ------------------------------------------------------------- the opening flow
@@ -333,7 +343,7 @@
       var at = session.status && typeof session.status.track === "number" ? session.status.track : 0;
       S.focus.setScope(S$("player"), items[at] || S$("btn-toggle"));
     } else {
-      osd("Back: controls");
+      osd("OK or Back: controls");
     }
   }
 
@@ -360,6 +370,7 @@
       current.vlcUp = true;
       current.status = st;
       if (current.started) S$("loading").hidden = true;
+      else S$("loading-text").textContent = current.streamReady ? "Starting the disc" : "Connecting to the video";
       renderStatus();
       tryStart();
     }, function (err) {
@@ -388,6 +399,9 @@
         if (!session) return;
         session.streamReady = true;
         tryStart();
+      },
+      onError: function (detail) {
+        failure("This TV did not accept the stream", detail + "\n\n" + navigator.userAgent, reopen);
       },
       onAudio: function (ok) {
         if (!session) return;
@@ -451,7 +465,7 @@
       S.show("player");
       session = {
         disc: disc, resume: resume, kind: disc.kind === "cd" ? "cd" : "dvd", openedAt: Date.now(),
-        status: null, stream: null, info: null, failures: 0, track: -1, lastCmd: 0,
+        status: null, stream: null, info: null, failures: 0, track: -1, lastCmd: 0, lastNav: 0,
         streamReady: false, vlcUp: false, starting: false, started: false, failed: false,
         audible: null, barOpen: false, pop: null
       };
@@ -492,9 +506,15 @@
         return;
       }
       if (!session.barOpen) {
-        if (ARROWS[name]) fire("nav", name);
-        else if (name === "enter") fire("nav", "activate");
-        else if (name === "back" || name === "info") openBar();
+        if (ARROWS[name]) {
+          session.lastNav = Date.now();
+          fire("nav", name);
+        } else if (name === "enter") {
+          if (okGoesToDisc()) fire("nav", "activate");
+          else openBar();
+        } else if (name === "back" || name === "info") {
+          openBar();
+        }
         return;
       }
       bumpBar();

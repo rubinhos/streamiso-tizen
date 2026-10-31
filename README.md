@@ -9,7 +9,7 @@ DVD images and audio CD images with their real menus. It has its own screens and
 running Streamiso server. To learn more about Streamiso itself, see [its repository](https://github.com/rubinhos/streamiso).
 
 > **Vibe coded:** written with an AI assistant ([Claude](https://claude.ai)) and tested by the author.
-> **Early prototype:** the app has been tested on a PC, and has not run on a real TV yet.
+> **Early prototype:** tested on one TV, a 2020 model with Tizen 5.5.
 
 | | |
 |---|---|
@@ -21,7 +21,7 @@ running Streamiso server. To learn more about Streamiso itself, see [its reposit
 
 - A PC and a Samsung TV on the same network
 - [Tizen Studio](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/installing-tv-sdk.html), with
-  **Samsung TV Extensions** and **Samsung Certificate Extension** from its Package Manager
+  **Certificate Manager**, **TV Extensions** and **Samsung Certificate Extension** from its Package Manager
 - A Samsung account, for the certificate
 - `tizen` and `sdb` on your `PATH` (in `tizen-studio/tools/ide/bin` and `tizen-studio/tools`)
 

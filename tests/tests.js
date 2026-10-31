@@ -340,6 +340,49 @@
       });
     },
 
+    function okKey() {
+      return toCatalog().then(function () { return openDisc(DVD_PLAIN); }).then(function () {
+        S().player.config.navWindowMs = 300;
+        return sleep(1200);
+      }).then(clearLog).then(function () {
+        return press("enter");
+      }).then(actions).then(function (log) {
+        check("in a menu, OK presses the disc's button", hasAction(log, "nav", "activate"), log);
+        check("in a menu, OK does not open the bar", !shown("bar"));
+        return sleep(1200);  // the status now reports the film
+      }).then(clearLog).then(function () {
+        return press("enter");
+      }).then(actions).then(function (log) {
+        check("in the film, OK opens the bar", shown("bar"));
+        check("in the film, OK does not reach the disc", !hasAction(log, "nav"), log);
+        check("the bar opens on Pause or Play", active().id === "btn-toggle", active().id);
+        return press("back");
+      }).then(function () {
+        check("Back closes it", !shown("bar"));
+        return clearLog();
+      }).then(function () {
+        return pressAll(["down", "enter"]);
+      }).then(actions).then(function (log) {
+        check("right after an arrow, OK goes to the disc", hasAction(log, "nav", "activate"), log);
+        check("right after an arrow, OK does not open the bar", !shown("bar"));
+        return sleep(450);
+      }).then(function () {
+        return press("enter");
+      }).then(function () {
+        check("a moment later, OK opens the bar again", shown("bar"));
+        return press("back");
+      }).then(function () {
+        return post("/api/player/cmd", { action: "menu" });  // the server now reports the menu
+      }).then(function () {
+        return sleep(1200);
+      }).then(clearLog).then(function () {
+        return press("back");
+      }).then(function () {
+        check("Back still opens the bar in a menu", shown("bar"));
+        return press("stop");
+      });
+    },
+
     function seekLine() {
 
       return toCatalog().then(function () {
@@ -476,6 +519,8 @@
         return until(function () { return shown("dialog"); }, "the stream error", 6000);
       }).then(function () {
         check("a stream that never arrives says so", /did not start/.test($("dialog-title").textContent), $("dialog-title").textContent);
+        check("it says the last step it reached", /Last step: /.test($("dialog-text").textContent), $("dialog-text").textContent);
+        check("it does not blame the network before the TV answered", !/SERVER_IP/.test($("dialog-text").textContent), $("dialog-text").textContent);
         return actions();
       }).then(function (log) {
         check("start waits for the video", !hasAction(log, "start"), log);
@@ -520,6 +565,22 @@
         return until(function () { return !shown("loading"); }, "start");
       }).then(function () {
         return press("stop");
+      });
+    },
+
+    function vlcUpMessage() {
+      return toCatalog().then(function () {
+        return post("/_mock/set", { stream_silent: true });
+      }).then(function () {
+        S().focus.focus(discCard(DVD_PLAIN));
+        return press("enter");
+      }).then(function () {
+        return until(function () { return /Connecting to the video/.test($("loading-text").textContent); }, "the message to change once VLC is up", 4000);
+      }).then(function () {
+        check("the VLC message goes away once VLC is up", !/VLC is starting/.test($("loading-text").textContent));
+        return post("/_mock/set", { stream_silent: false });
+      }).then(function () {
+        return press("back");
       });
     },
 
