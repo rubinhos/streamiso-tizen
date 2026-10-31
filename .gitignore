@@ -1,0 +1,10 @@
+# Tizen packaging output and signing data
+*.wgt
+.buildResult
+.sign/
+.manifest
+.project
+.tproject
+*.p12
+author.xml
+signature*.xml
