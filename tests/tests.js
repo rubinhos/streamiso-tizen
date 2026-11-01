@@ -82,7 +82,11 @@
     S().focus.focus(discCard(id));
     return press("enter").then(function () {
       return until(function () { return shown("sink") !== null && S().player.isOpen() && !shown("loading"); }, "the disc to start");
-    });
+    }).then(closeBar);
+  }
+  // A DVD starts with the bar showing.
+  function closeBar() {
+    return shown("bar") && !shown("cd") ? press("back") : null;
   }
   function hasAction(log, action, value) {
     return log.some(function (e) { return e.action === action && (value === undefined || JSON.stringify(e.value) === JSON.stringify(value)); });
@@ -197,7 +201,8 @@
 
     function blockedSound() {
       return toCatalog().then(function () {
-        return post("/_mock/set", { unlock_blocked: 1 });
+        // Blocks the start itself and the key press that closes the bar, which also tries to turn the sound on.
+        return post("/_mock/set", { unlock_blocked: 2 });
       }).then(function () {
         S().player.config.soundCheckMs = 200;
         return openDisc(DVD_PLAIN);
@@ -224,8 +229,11 @@
         var navs = log.filter(function (e) { return e.action === "nav"; }).map(function (e) { return e.value; });
         check("arrows and OK go to the DVD menu", JSON.stringify(navs) === JSON.stringify(["up", "down", "left", "right", "activate"]), navs);
         check("the bar stays closed for those keys", !shown("bar"));
-        return clearLog();
+        // OK left the menu, and the rest of this test needs the menu.
+        return post("/api/player/cmd", { action: "menu" });
       }).then(function () {
+        return sleep(1200);
+      }).then(clearLog).then(function () {
         return press("back");
       }).then(function () {
         check("Back opens the bar", shown("bar"));
@@ -307,7 +315,7 @@
         return press("enter");  // Continue
       }).then(function () {
         return until(function () { return S().player.isOpen() && !shown("loading"); }, "start");
-      }).then(function () {
+      }).then(closeBar).then(function () {
         return sleep(1200);
       }).then(clearLog).then(function () {
         return press("playpause");
@@ -340,11 +348,25 @@
       });
     },
 
-    function okKey() {
-      return toCatalog().then(function () { return openDisc(DVD_PLAIN); }).then(function () {
+    function barKeys() {
+      return toCatalog().then(function () {
+        S().player.config.barHideMs = 400;
         S().player.config.navWindowMs = 300;
-        return sleep(1200);
+        S().focus.focus(discCard(DVD_PLAIN));
+        return press("enter");
+      }).then(function () {
+        return until(function () { return S().player.isOpen() && !shown("loading"); }, "the disc to start");
+      }).then(function () {
+        check("the bar shows as soon as the video starts", shown("bar"));
+        check("it starts on Pause or Play", active().id === "btn-toggle", active().id);
+        return until(function () { return !shown("bar"); }, "the bar to close by itself", 2000);
+      }).then(function () {
+        return sleep(1200);  // the status now reports the menu
       }).then(clearLog).then(function () {
+        return pressAll(["up", "down"]);
+      }).then(actions).then(function (log) {
+        check("in a menu with a duration, Up and Down go to the disc", hasAction(log, "nav", "up") && hasAction(log, "nav", "down"), log);
+        check("in a menu, Up and Down do not open the bar", !shown("bar"));
         return press("enter");
       }).then(actions).then(function (log) {
         check("in a menu, OK presses the disc's button", hasAction(log, "nav", "activate"), log);
@@ -353,38 +375,54 @@
       }).then(clearLog).then(function () {
         return press("enter");
       }).then(actions).then(function (log) {
-        check("in the film, OK opens the bar", shown("bar"));
-        check("in the film, OK does not reach the disc", !hasAction(log, "nav"), log);
-        check("the bar opens on Pause or Play", active().id === "btn-toggle", active().id);
+        check("in the film, OK never opens the bar", !shown("bar"));
+        check("in the film, OK still goes to the disc", hasAction(log, "nav", "activate"), log);
+        return sleep(450);
+      }).then(clearLog).then(function () {
+        return press("up");
+      }).then(actions).then(function (log) {
+        check("in the film, Up opens the bar", shown("bar"));
+        check("that Up does not reach the disc", !hasAction(log, "nav"), log);
         return press("back");
       }).then(function () {
         check("Back closes it", !shown("bar"));
-        return clearLog();
+        return sleep(100);
       }).then(function () {
-        return pressAll(["down", "enter"]);
-      }).then(actions).then(function (log) {
-        check("right after an arrow, OK goes to the disc", hasAction(log, "nav", "activate"), log);
-        check("right after an arrow, OK does not open the bar", !shown("bar"));
-        return sleep(450);
+        return press("down");
       }).then(function () {
-        return press("enter");
-      }).then(function () {
-        check("a moment later, OK opens the bar again", shown("bar"));
+        check("in the film, Down opens the bar", shown("bar"));
         return press("back");
       }).then(function () {
-        return post("/api/player/cmd", { action: "menu" });  // the server now reports the menu
+        return press("back");
+      }).then(function () {
+        check("in the film, Back opens the bar", shown("bar"));
+        return press("back");
+      }).then(clearLog).then(function () {
+        return pressAll(["left", "up"]);
+      }).then(actions).then(function (log) {
+        check("in the film, Left goes to the disc", hasAction(log, "nav", "left"), log);
+        check("right after using the disc, Up stays with it", hasAction(log, "nav", "up") && !shown("bar"), log);
+        return post("/_mock/set", { film_length: 120 });
+      }).then(function () {
+        return sleep(1500);
+      }).then(clearLog).then(function () {
+        return press("up");
+      }).then(actions).then(function (log) {
+        check("in a short title, Up goes to the disc", hasAction(log, "nav", "up") && !shown("bar"), log);
+        return post("/_mock/set", { film_length: 6300 });
+      }).then(function () {
+        return post("/api/player/cmd", { action: "menu" });
       }).then(function () {
         return sleep(1200);
-      }).then(clearLog).then(function () {
+      }).then(function () {
         return press("back");
       }).then(function () {
-        check("Back still opens the bar in a menu", shown("bar"));
+        check("in a menu, Back opens the bar", shown("bar"));
         return press("stop");
       });
     },
 
     function seekLine() {
-
       return toCatalog().then(function () {
         S().focus.focus(discCard(DVD_RESUME));
         return press("enter");
@@ -394,8 +432,6 @@
         return until(function () { return S().player.isOpen() && !shown("loading"); }, "start");
       }).then(function () {
         return sleep(1200);
-      }).then(function () {
-        return press("back");
       }).then(function () {
         return press("up");
       }).then(function () {

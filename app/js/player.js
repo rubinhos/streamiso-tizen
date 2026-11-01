@@ -1,6 +1,7 @@
 // The player. The same keys do different things depending on what is on screen:
-//   DVD, bar closed: arrows go to the disc's menu through the API. OK presses a menu's button, and during the
-//                    film it opens the bar. Back or Info always open the bar.
+//   DVD starting:    the bar shows by itself, and closes after a few seconds like any other time.
+//   DVD, bar closed: Left, Right and OK always go to the disc through the API. Up and Down go to it in a menu,
+//                    and open the bar during a film. Back or Info always open the bar.
 //   DVD, bar open:   arrows move between the buttons. Back closes it, and so do a few seconds without a key.
 //   CD:              there is no video menu, so arrows move through the track list and the buttons.
 //                    Back leaves the player.
@@ -12,7 +13,8 @@
   var ARROWS = { left: 1, right: 1, up: 1, down: 1 };
   var SCRUB_RUN_MS = 700;
   var STATUS_SETTLE_MS = 300;
-  // The same icons as Streamiso's web player.
+  var MENU_MAX_SECONDS = 300;
+  // The same icons as StreamISO's web player.
   var ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
   var ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
   var session = null;
@@ -37,12 +39,17 @@
   }
   function fire(action, value) { cmd(action, value).catch(function () { /* already shown */ }); }
 
-  // OK has to press the buttons of a disc's menu, and otherwise opens the bar. A menu usually reports title 0
-  // or no duration. Some have a duration, so OK also goes to the disc right after moving with the arrows.
-  function okGoesToDisc() {
+  // Up and Down open the bar during a film, but a disc's menu needs them. On real discs a menu reports title 0
+  // and a duration of seconds to a few minutes, so a short title counts as a menu, as it does for StreamISO's
+  // resume. A menu may still look like a film, so these keys also stay with the disc right after using it.
+  function upDownGoToDisc() {
     var st = session.status;
-    if (!st || !st.length || st.title === 0) return true;
+    if (!st || !st.length || st.title === 0 || st.length < MENU_MAX_SECONDS) return true;
     return Date.now() - session.lastNav < config.navWindowMs;
+  }
+  function sendNav(value) {
+    session.lastNav = Date.now();
+    fire("nav", value);
   }
 
   // ------------------------------------------------------------- the bar (DVD)
@@ -232,10 +239,10 @@
     if (session.kind === "cd") {
       if (typeof st.track === "number") extra = "Track " + (st.track + 1) + (st.tracks ? " of " + st.tracks : "");
       renderTracks(st);
-    } else if (st.chapter) {
-      extra = "Chapter " + st.chapter;
-    } else if (!length) {
+    } else if (st.title === 0 || !length) {
       extra = "DVD menu";
+    } else if (typeof st.chapter === "number") {
+      extra = "Chapter " + (st.chapter + 1);
     }
     S$("bar-extra").textContent = extra;
   }
@@ -343,7 +350,7 @@
       var at = session.status && typeof session.status.track === "number" ? session.status.track : 0;
       S.focus.setScope(S$("player"), items[at] || S$("btn-toggle"));
     } else {
-      osd("OK or Back: controls");
+      openBar();
     }
   }
 
@@ -506,14 +513,12 @@
         return;
       }
       if (!session.barOpen) {
-        if (ARROWS[name]) {
-          session.lastNav = Date.now();
-          fire("nav", name);
-        } else if (name === "enter") {
-          if (okGoesToDisc()) fire("nav", "activate");
+        if (name === "back" || name === "info") openBar();
+        else if (name === "enter") sendNav("activate");
+        else if (name === "left" || name === "right") sendNav(name);
+        else if (name === "up" || name === "down") {
+          if (upDownGoToDisc()) sendNav(name);
           else openBar();
-        } else if (name === "back" || name === "info") {
-          openBar();
         }
         return;
       }

@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="app/img/logo.svg" alt="Streamiso" width="420">
+  <img src="app/img/logo.svg" alt="StreamISO" width="420">
 </p>
 
-# Streamiso for Samsung TV
+# StreamISO for Samsung TV
 
-A Samsung TV (Tizen) app for [Streamiso](https://github.com/rubinhos/streamiso), the self-hosted library that plays your
+A Samsung TV (Tizen) app for [StreamISO](https://github.com/rubinhos/streamiso), the self-hosted library that plays your
 DVD images and audio CD images with their real menus. It has its own screens and controls, made for the remote. You need a
-running Streamiso server. To learn more about Streamiso itself, see [its repository](https://github.com/rubinhos/streamiso).
+running StreamISO server. To learn more about StreamISO itself, see [its repository](https://github.com/rubinhos/streamiso).
 
 > **Vibe coded:** written with an AI assistant ([Claude](https://claude.ai)) and tested by the author.
 > **Early prototype:** tested on one TV, a 2020 model with Tizen 5.5.
@@ -27,7 +27,7 @@ running Streamiso server. To learn more about Streamiso itself, see [its reposit
 
 ### 1. Set up the server
 
-Add this to Streamiso's `.env`, then run `docker compose up -d`:
+Add this to StreamISO's `.env`, then run `docker compose up -d`:
 
 ```ini
 CORS_ORIGIN=null
@@ -60,14 +60,14 @@ cd streamiso-tizen/app
 tizen build-web -e ".*"
 tizen package -t wgt -s YOUR_PROFILE -o .. -- .buildResult
 cd ..
-tizen install -n Streamiso.wgt -t YOUR_DEVICE_NAME
+tizen install -n StreamISO.wgt -t YOUR_DEVICE_NAME
 ```
 
 If the install fails with error 1010, check the certificate.
 
 ### 6. Open the app
 
-Open **Streamiso** in **Apps**, enter your server's address (for example `192.168.0.10:8080`) and choose
+Open **StreamISO** in **Apps**, enter your server's address (for example `192.168.0.10:8080`) and choose
 **Save and connect**. The app remembers it, and you can change it later in **Settings**.
 
 ## Development
@@ -76,4 +76,4 @@ See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the remote's keys, running th
 
 ## License
 
-[Apache License 2.0](LICENSE). See [NOTICE](NOTICE). "Streamiso" is not affiliated with Stremio or with Samsung.
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE). "StreamISO" is not affiliated with Stremio or with Samsung.

@@ -1,4 +1,4 @@
-// The Streamiso HTTP API. See docs/API.md in the Streamiso repository.
+// The StreamISO HTTP API. See docs/API.md in the StreamISO repository.
 (function (S) {
   "use strict";
 

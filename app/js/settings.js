@@ -38,7 +38,7 @@
     }, function (err) {
       message.className = "message";
       message.textContent = err.kind === "network"
-        ? "No answer from " + base + ". Check that Streamiso is running and that CORS_ORIGIN=null is in its .env file."
+        ? "No answer from " + base + ". Check that StreamISO is running and that CORS_ORIGIN=null is in its .env file."
         : "The server answered with an error: " + err.message;
     });
   }

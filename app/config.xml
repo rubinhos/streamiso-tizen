@@ -4,7 +4,7 @@
     <tizen:profile name="tv-samsung"/>
     <content src="index.html"/>
     <icon src="icon.png"/>
-    <name>Streamiso</name>
+    <name>StreamISO</name>
     <access origin="*" subdomains="true"/>
     <tizen:allow-navigation>*</tizen:allow-navigation>
     <tizen:privilege name="http://tizen.org/privilege/internet"/>

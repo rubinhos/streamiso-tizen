@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A stand-in for a Streamiso server, for working on the app without the real one or the TV.
+"""A stand-in for a StreamISO server, for working on the app without the real one or the TV.
 
 Standard library only. Port 8090 answers like the catalog and also serves app/ and tests/. Port 8091 stands in
 for the Neko stream, on a different origin as the real one is. Every title and cover here is invented.
@@ -74,7 +74,7 @@ def reset():
     state.clear()
     state.update({"disc": None, "resume": False, "opened_at": 0, "started": False, "paused": True, "time": 0.0,
                   "tick": time.time(), "volume": 80, "track": 0, "in_menu": True, "api_down": False,
-                  "stream_silent": False, "audio_blocked": True, "unlock_blocked": 0, "fail_start": 0})
+                  "stream_silent": False, "audio_blocked": True, "unlock_blocked": 0, "fail_start": 0, "film_length": 6300})
     del log[:]
 
 
@@ -119,8 +119,10 @@ def status():
         length = tracks[state["track"]][1]
         return {"state": vlc_state, "kind": "cd", "volume": state["volume"], "track": state["track"], "tracks": len(tracks),
                 "time": int(state["time"]), "length": length, "abs": int(state["time"])}
-    return {"state": vlc_state, "time": 0 if state["in_menu"] else int(state["time"]), "length": 0 if state["in_menu"] else 6300,
-            "volume": state["volume"], "chapter": None if state["in_menu"] else 4, "title": 0 if state["in_menu"] else 1,
+    # A real disc's menu reports title 0 and a short duration, not "no duration".
+    return {"state": vlc_state, "time": int(state["time"]) % 190 if state["in_menu"] else int(state["time"]),
+            "length": 190 if state["in_menu"] else state["film_length"],
+            "volume": state["volume"], "chapter": 0 if state["in_menu"] else 3, "title": 0 if state["in_menu"] else 1,
             "audio": [{"id": 1, "name": "English"}, {"id": 2, "name": "Portuguese"}],
             "subtitles": [{"id": -1, "name": "Disable"}, {"id": 3, "name": "English"}, {"id": 4, "name": "Portuguese"}]}
 
@@ -316,7 +318,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     servers = [ThreadingHTTPServer(("0.0.0.0", port), Handler) for port in (API_PORT, STREAM_PORT)]
     threading.Thread(target=servers[1].serve_forever, daemon=True).start()
-    print("Mock Streamiso: http://localhost:%d/app/  tests: http://localhost:%d/tests/" % (API_PORT, API_PORT), flush=True)
+    print("Mock StreamISO: http://localhost:%d/app/  tests: http://localhost:%d/tests/" % (API_PORT, API_PORT), flush=True)
     servers[0].serve_forever()
 
 

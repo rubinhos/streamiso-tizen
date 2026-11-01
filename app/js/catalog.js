@@ -111,7 +111,7 @@
     S.dialog.show({
       title: err.kind === "network" ? "Server unreachable" : "The server answered with an error",
       text: err.kind === "network"
-        ? "No answer from " + S.api.server() + ".\nCheck that Streamiso is running and that CORS_ORIGIN=null is in its .env file."
+        ? "No answer from " + S.api.server() + ".\nCheck that StreamISO is running and that CORS_ORIGIN=null is in its .env file."
         : err.message,
       buttons: [
         { label: "Try again", action: function () { S.catalog.show(); } },

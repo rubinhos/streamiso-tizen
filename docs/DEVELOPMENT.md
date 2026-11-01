@@ -23,13 +23,14 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 | Catalog | Move and open | Leave the app |
 | Settings | Move, OK to type | Return to the catalog |
 | DVD menu, bar closed | Go to the disc's menu | Open the bar |
-| DVD film, bar closed | Arrows go to the disc, OK opens the bar | Open the bar |
+| DVD film, bar closed | Up and Down open the bar. Left, Right and OK go to the disc | Open the bar |
 | DVD, bar open | Move between the controls | Close the bar |
 | CD | Move through the tracks and controls | Return to the catalog |
 
-- The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu again. Info also opens it.
-- A menu is recognized by title 0 or no duration. Some menus report a duration, so for 5 seconds after an arrow, OK goes to
-  the disc even during what looks like the film.
+- A DVD starts with the bar showing. The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu
+  again. Info also opens it.
+- A menu is recognized by title 0, no duration, or a duration under 5 minutes. Real menus report a duration, so that alone
+  is not enough. For 5 seconds after using the disc (any arrow or OK), Up and Down stay with it even in what looks like a film.
 - The back arrow in the bar, or Stop, leaves a DVD.
 - **Progress line:** press Up from the buttons to reach it, then Left and Right to move. The jump happens when you stop
   pressing, or right away with OK. Holding the key moves faster.
@@ -40,13 +41,13 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 
 The app picks one of two routes. **Settings** shows which one it is using.
 
-- **Neko page in an iframe,** as Streamiso's `docs/API.md` describes, on engines that can run that page.
+- **Neko page in an iframe,** as StreamISO's `docs/API.md` describes, on engines that can run that page.
 - **Built-in client** (a WebSocket, `RTCPeerConnection` and a `<video>`) on older engines. The current Neko page uses syntax
   (`?.`, `??`, `||=`) that Chromium M69 cannot parse.
 
 The built-in client reads Neko's login answer. A 2020 TV read it without any setting on the server, but a desktop browser
 needs CORS on Neko. Without the answer the client falls back to Neko's older socket, which connected less reliably in
-testing. If you need it, in the `neko` service of Streamiso's `docker-compose.yml`:
+testing. If you need it, in the `neko` service of StreamISO's `docker-compose.yml`:
 
 ```yaml
 NEKO_SERVER_CORS: "${CORS_ORIGIN:-}"
