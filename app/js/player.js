@@ -1,5 +1,5 @@
 // The player. The same keys do different things depending on what is on screen:
-//   DVD starting:    the bar shows by itself, and closes after a few seconds like any other time.
+//   DVD starting:    the bar stays closed, so nothing covers the disc's own menu. Back or Info open it.
 //   DVD, bar closed: Left, Right and OK always go to the disc through the API. Up and Down go to it in a menu,
 //                    and open the bar during a film. Back or Info always open the bar.
 //   DVD, bar open:   arrows move between the buttons. Back closes it, and so do a few seconds without a key.
@@ -349,9 +349,8 @@
       var items = S$("cd-tracks").children;
       var at = session.status && typeof session.status.track === "number" ? session.status.track : 0;
       S.focus.setScope(S$("player"), items[at] || S$("btn-toggle"));
-    } else {
-      openBar();
     }
+    // A DVD starts with the bar closed: many discs open on a menu, and the bar would cover its buttons.
   }
 
   function poll() {

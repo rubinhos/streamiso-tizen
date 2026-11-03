@@ -84,7 +84,7 @@
       return until(function () { return shown("sink") !== null && S().player.isOpen() && !shown("loading"); }, "the disc to start");
     }).then(closeBar);
   }
-  // A DVD starts with the bar showing.
+  // A DVD starts with the bar closed; this only matters if something opened it.
   function closeBar() {
     return shown("bar") && !shown("cd") ? press("back") : null;
   }
@@ -406,8 +406,11 @@
       }).then(function () {
         return until(function () { return S().player.isOpen() && !shown("loading"); }, "the disc to start");
       }).then(function () {
-        check("the bar shows as soon as the video starts", shown("bar"));
-        check("it starts on Pause or Play", active().id === "btn-toggle", active().id);
+        check("the bar stays closed when the video starts", !shown("bar"));
+        check("the focus starts in the sink", active().id === "sink", active().id);
+        return press("back");
+      }).then(function () {
+        check("Back opens it on Pause or Play", shown("bar") && active().id === "btn-toggle", active().id);
         return until(function () { return !shown("bar"); }, "the bar to close by itself", 2000);
       }).then(function () {
         return sleep(1200);  // the status now reports the menu
@@ -481,6 +484,8 @@
         return until(function () { return S().player.isOpen() && !shown("loading"); }, "start");
       }).then(function () {
         return sleep(1200);
+      }).then(function () {
+        return press("back");  // a DVD starts with the bar closed
       }).then(function () {
         return press("up");
       }).then(function () {

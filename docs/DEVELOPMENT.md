@@ -30,8 +30,8 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 
 - The discs of a TV season (`Show S02 D1`, or a season set in StreamISO's editor) form one card, as on StreamISO's web
   page. OK opens the season's discs in disc order. Leaving a disc returns to its season.
-- A DVD starts with the bar showing. The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu
-  again. Info also opens it.
+- A DVD starts with the bar closed, so it never covers the disc's own menu. Back or Info open it (and Up or Down during a
+  film). The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu again.
 - A menu is recognized by title 0, no duration, or a duration under 5 minutes. Real menus report a duration, so that alone
   is not enough. For 5 seconds after using the disc (any arrow or OK), Up and Down stay with it even in what looks like a film.
 - The back arrow in the bar, or Stop, leaves a DVD.
