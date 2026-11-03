@@ -21,12 +21,15 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 | Where | Arrows and OK | Back |
 |---|---|---|
 | Catalog | Move and open | Leave the app |
+| A season's discs | Move and open | Return to the catalog |
 | Settings | Move, OK to type | Return to the catalog |
 | DVD menu, bar closed | Go to the disc's menu | Open the bar |
 | DVD film, bar closed | Up and Down open the bar. Left, Right and OK go to the disc | Open the bar |
 | DVD, bar open | Move between the controls | Close the bar |
 | CD | Move through the tracks and controls | Return to the catalog |
 
+- The discs of a TV season (`Show S02 D1`, or a season set in StreamISO's editor) form one card, as on StreamISO's web
+  page. OK opens the season's discs in disc order. Leaving a disc returns to its season.
 - A DVD starts with the bar showing. The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu
   again. Info also opens it.
 - A menu is recognized by title 0, no duration, or a duration under 5 minutes. Real menus report a duration, so that alone

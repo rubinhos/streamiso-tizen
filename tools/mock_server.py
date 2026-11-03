@@ -25,7 +25,8 @@ VLC_START_SECONDS = 1.0
 
 def dvd(number, title, year, genres, synopsis, **extra):
     disc = {"id": "d%011d" % number, "kind": "dvd", "title": title, "year": year, "genres": genres,
-            "synopsis": synopsis, "watched": False, "resume": None, "cover_v": 1}
+            "synopsis": synopsis, "watched": False, "resume": None, "cover_v": 1,
+            "season": None, "disc": None, "tmdb_series": None}
     disc.update(extra)
     return disc
 
@@ -55,8 +56,12 @@ DISCS = [
     dvd(10, "Saltwater Symphony", 2009, ["Music", "Drama"], "A fishing village forms an orchestra."),
     dvd(11, "The Beekeeper's Gambit", 2013, ["Comedy"], "A chess tournament is thrown into chaos by a hive."),
     dvd(12, "Glass Mountain Radio", 2005, ["Drama"], "The last broadcaster above the snow line refuses to sign off.", watched=True),
-    dvd(13, "Tales from the Fifth Floor: Disc 1", 2018, ["Comedy"], "An office, an elevator and a very long Tuesday.", series="Tales from the Fifth Floor", season=1, disc=1),
-    dvd(14, "Tales from the Fifth Floor: Disc 2", 2018, ["Comedy"], "The elevator is fixed, and that makes everything worse.", series="Tales from the Fifth Floor", season=1, disc=2),
+    # A season: one disc names it in its title, the others have it set in the editor, as on the real server.
+    dvd(13, "Tales from the Fifth Floor S01 D2", 2018, ["Comedy"], "The elevator is fixed, and that makes everything worse.",
+        resume={"time": 1210, "pct": 30}),
+    dvd(14, "Tales from the Fifth Floor", 2018, ["Comedy"], "An office, an elevator and a very long Tuesday.", season=1, disc=1),
+    dvd(15, "Tales from the Fifth Floor", 2019, ["Comedy"], "A new floor opens, and nobody has the key.", season=2, disc=1,
+        watched=True),
     cd(1, "Harbour Songs", "The Quayside Quartet", 2002, ["Folk"], TONES, resume={"time": 603, "pct": 35, "track": 3, "track_time": 41}),
     cd(2, "Copper and Rain", "Marla Venn", 1999, ["Jazz"], TONES[:5], watched=True),
     cd(3, "Field Recordings for Small Rooms", "Ostinato Club", 2014, ["Ambient"], TONES[2:]),
@@ -243,7 +248,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/discs":
                 playing = state["disc"]["id"] if state["disc"] else None
-                self.send_json(200, {"discs": [public_disc(d) for d in DISCS], "genres": [], "series": [],
+                self.send_json(200, {"discs": [public_disc(d) for d in DISCS], "genres": [],
                                      "media_dir": "/media", "tmdb": False, "playing": playing})
             elif path.startswith("/api/cover/"):
                 disc = find(path.rsplit("/", 1)[1])

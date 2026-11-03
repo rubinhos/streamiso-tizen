@@ -152,6 +152,55 @@
       });
     },
 
+    function seasons() {
+      var SEASON_D1 = "d00000000014", SEASON_D2 = "d00000000013", OTHER_SEASON = "d00000000015";
+      var seasonOf = function (d) { return S().catalog.seasonOf(d); };
+      var parsed = function (title) { var s = seasonOf({ kind: "dvd", title: title }); return s && [s.name, s.season, s.disc]; };
+      return toCatalog().then(function () {
+        check("a season in the title", JSON.stringify(parsed("Lost - Season 2 Disc 3")) === '["Lost",2,3]', parsed("Lost - Season 2 Disc 3"));
+        check("S01 D02 in the title", JSON.stringify(parsed("Friends S01 D02")) === '["Friends",1,2]', parsed("Friends S01 D02"));
+        check("a title without a season", parsed("Moonlit Marmalade") === null);
+        check("an edited season with a plain title", seasonOf({ kind: "dvd", title: "Show", season: 3 }).key === "show|3");
+        check("a TMDB series id groups apart from the name",
+          seasonOf({ kind: "dvd", title: "Show", season: 1, tmdb_series: 42 }).key === "tmdb:42|1");
+        var groups = doc().querySelectorAll("[data-group]");
+        check("the discs of a season form one card", groups.length === 1 && !discCard(SEASON_D1) && !discCard(SEASON_D2), groups.length);
+        check("a season with one disc stays a plain card", !!discCard(OTHER_SEASON));
+        var g = groups[0];
+        check("the season card counts its discs", g.querySelector(".tag").textContent === "2 discs", g.querySelector(".tag").textContent);
+        check("the season card is named after the series", g.querySelector(".card-title").textContent === "Tales from the Fifth Floor");
+        check("the season card says which disc to continue", g.querySelector(".card-resume").textContent === "Continue disc 2",
+          g.querySelector(".card-resume").textContent);
+        S().focus.focus(g);
+        check("details name the season", /Fifth Floor . Season 1/.test($("detail-title").textContent), $("detail-title").textContent);
+        return press("enter");
+      }).then(function () {
+        check("OK opens the season", S().catalog.isSeasonOpen());
+        var title = doc().querySelector(".section-title").textContent;
+        check("the season view has the season's title", /Season 1$/.test(title), title);
+        var ids = Array.prototype.map.call(doc().querySelectorAll("#catalog-list .card"), function (c) { return c.getAttribute("data-id"); });
+        check("the season lists its discs in disc order", JSON.stringify(ids) === JSON.stringify([SEASON_D1, SEASON_D2]), ids);
+        check("the first disc has the focus", cardId() === SEASON_D1, cardId());
+        return press("right");
+      }).then(function () {
+        check("right moves to the next disc", cardId() === SEASON_D2, cardId());
+        return press("back");
+      }).then(function () {
+        check("Back closes the season", !S().catalog.isSeasonOpen() && !S().tv.exited);
+        check("the focus returns to the season card", active().hasAttribute("data-group"), active().className);
+        return press("enter");
+      }).then(function () {
+        return openDisc(SEASON_D1);
+      }).then(function () {
+        return press("stop");
+      }).then(function () {
+        return until(function () { return S().currentScreen() === "catalog" && doc().querySelector(".card:focus"); }, "the catalog");
+      }).then(function () {
+        check("leaving a disc returns to its season", S().catalog.isSeasonOpen() && cardId() === SEASON_D1, cardId());
+        return press("back");
+      });
+    },
+
     function resumeDialog() {
       return toCatalog().then(function () {
         S().focus.focus(discCard(DVD_RESUME));
