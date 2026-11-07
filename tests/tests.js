@@ -62,15 +62,18 @@
     return names.reduce(function (p, n) { return p.then(function () { return press(n); }); }, Promise.resolve());
   }
 
-  function loadApp(server) {
+  // showSeen: false starts the app as it does at first, with the discs already played hidden. Most tests need
+  // them, so they are shown otherwise.
+  function loadApp(server, showSeen) {
     localStorage.setItem("streamiso.server", server === undefined ? location.origin : server);
+    localStorage.setItem("streamiso.showSeen", showSeen === false ? "0" : "1");
     return new Promise(function (resolve) {
       frame.onload = resolve;
       frame.src = "/app/index.html?" + Date.now();
     });
   }
-  function toCatalog() {
-    return post("/_mock/reset").then(function () { return loadApp(); }).then(function () {
+  function toCatalog(showSeen) {
+    return post("/_mock/reset").then(function () { return loadApp(undefined, showSeen); }).then(function () {
       return until(function () { return doc().querySelector(".card:focus"); }, "first card focused");
     });
   }
@@ -108,7 +111,7 @@
 
     function catalog() {
       return toCatalog().then(function () {
-        check("sections for DVDs and CDs", doc().querySelectorAll(".section-title").length === 2);
+        check("sections for discs in progress, DVDs and CDs", doc().querySelectorAll(".section-title").length === 3);
         check("first card has the focus", cardId() === DVD_RESUME, cardId());
         check("details follow the focus", /Lighthouse/.test($("detail-title").textContent));
         var first = discCard(DVD_RESUME);
@@ -118,7 +121,7 @@
         check("listened badge on a CD", discCard(CD_PLAIN).querySelector(".seen").textContent === "Listened");
         return press("right");
       }).then(function () {
-        check("right moves one card", cardId() === DVD_PLAIN, cardId());
+        check("right moves one card", cardId() === "d00000000013", cardId());  // the next disc in progress
         return press("left");
       }).then(function () {
         check("left moves back", cardId() === DVD_RESUME);
@@ -134,9 +137,12 @@
         check("down reaches the CD section", active().classList.contains("cd"), cardId());
         var box = $("catalog-scroll").getBoundingClientRect(), r = active().getBoundingClientRect();
         check("the focused card is on screen after scrolling", r.top >= box.top && r.bottom <= box.bottom, [r.top, r.bottom, box.top, box.bottom]);
-        return pressAll(["up", "up", "up", "up", "up", "up"]);
+        return pressAll(["up", "up", "up", "up", "up", "up", "up"]);
       }).then(function () {
-        check("up from the top row reaches Settings", active().id === "catalog-settings", active().id);
+        check("up from the top row reaches the header", active().id === "catalog-seen", active().id);
+        return press("right");
+      }).then(function () {
+        check("right in the header reaches Settings", active().id === "catalog-settings", active().id);
         return press("down");
       }).then(function () {
         check("down from Settings returns to the grid", !!cardId());
@@ -149,6 +155,40 @@
         return press("back");
       }).then(function () {
         check("Back in the catalog exits the app", S().tv.exited === true);
+      });
+    },
+
+    function seenAndProgress() {
+      var SEASON_D1 = "d00000000014", SEASON_D2 = "d00000000013", OTHER_SEASON = "d00000000015";
+      var titles = function () {
+        return Array.prototype.map.call(doc().querySelectorAll(".section-title"), function (t) { return t.textContent; });
+      };
+      var inSection = function (n) {
+        return Array.prototype.map.call(doc().querySelectorAll("#catalog-list .grid")[n].querySelectorAll(".card"), function (c) {
+          return c.getAttribute("data-id") || "group";
+        });
+      };
+      return toCatalog(false).then(function () {
+        check("discs in progress come first", JSON.stringify(titles()) === '["Continue","DVDs","Music CDs"]', titles());
+        check("the progress section lists them", JSON.stringify(inSection(0)) === JSON.stringify([DVD_RESUME, SEASON_D2, CD_RESUME]), inSection(0));
+        check("the first one has the focus", cardId() === DVD_RESUME, cardId());
+        check("a disc in progress leaves its section", inSection(1).indexOf(DVD_RESUME) === -1 && inSection(2).indexOf(CD_RESUME) === -1);
+        check("watched DVDs are hidden", !discCard(DVD_PLAIN) && !discCard("d00000000012") && !discCard(OTHER_SEASON));
+        check("listened CDs are hidden", !discCard(CD_PLAIN));
+        check("a season in progress keeps its card", inSection(1).indexOf("group") >= 0 && !discCard(SEASON_D1), inSection(1));
+        var eye = $("catalog-seen");
+        check("the eye button offers to show them", /Show played/.test(eye.textContent) && eye.getAttribute("aria-pressed") === "false",
+          eye.textContent.trim());
+        S().focus.focus(eye);
+        return press("enter");
+      }).then(function () {
+        check("the eye button shows them", !!discCard(DVD_PLAIN) && !!discCard(CD_PLAIN) && !!discCard(OTHER_SEASON));
+        check("the eye button keeps the focus", active().id === "catalog-seen", active().id);
+        check("it now offers to hide them", /Hide played/.test($("catalog-seen").textContent));
+        check("the choice is kept", localStorage.getItem("streamiso.showSeen") === "1" && S().catalog.showsSeen());
+        return press("enter");
+      }).then(function () {
+        check("and hides them again", !discCard(DVD_PLAIN) && localStorage.getItem("streamiso.showSeen") === "0");
       });
     },
 
@@ -168,7 +208,9 @@
         check("a TMDB series id groups apart from the name",
           seasonOf({ kind: "dvd", title: "Show", season: 1, tmdb_series: 42 }).key === "tmdb:42|1");
         var groups = doc().querySelectorAll("[data-group]");
-        check("the discs of a season form one card", groups.length === 1 && !discCard(SEASON_D1) && !discCard(SEASON_D2), groups.length);
+        // the disc in progress is also listed above, in the progress section
+        var inGrid = discCard(SEASON_D2) && discCard(SEASON_D2).parentNode !== doc().querySelectorAll("#catalog-list .grid")[0];
+        check("the discs of a season form one card", groups.length === 1 && !discCard(SEASON_D1) && !inGrid, groups.length);
         check("a season with one disc stays a plain card", !!discCard(OTHER_SEASON));
         var g = groups[0];
         check("the season card counts its discs", g.querySelector(".tag").textContent === "2 discs", g.querySelector(".tag").textContent);
@@ -228,6 +270,30 @@
       }).then(actions).then(function (log) {
         check("start over sends resume false", hasAction(log, "play", { id: DVD_RESUME, resume: false }), log);
         check("start over does not send resume_apply", !hasAction(log, "resume_apply"), log);
+      });
+    },
+
+    function removeFromContinue() {
+      var inProgress = function (id) {
+        var grid = doc().querySelectorAll("#catalog-list .grid")[0];
+        return !!grid.querySelector('[data-id="' + id + '"]');
+      };
+      return toCatalog().then(function () {
+        check("the disc starts in the progress section", inProgress(DVD_RESUME));
+        S().focus.focus(discCard(DVD_RESUME));
+        return press("enter");
+      }).then(function () {
+        return pressAll(["right", "right"]);
+      }).then(function () {
+        check("the dialog offers to remove it", active().textContent === "Remove from Continue", active().textContent);
+        return press("enter");
+      }).then(function () {
+        return until(function () { return !shown("dialog") && discCard(DVD_RESUME) && !inProgress(DVD_RESUME); }, "the disc to leave Continue");
+      }).then(actions).then(function (log) {
+        check("removing tells the server", hasAction(log, "resume_clear", DVD_RESUME), log);
+        check("removing plays nothing", !hasAction(log, "play"), log);
+        check("the disc is back in the DVDs", !inProgress(DVD_RESUME) && !/Continue at/.test(discCard(DVD_RESUME).textContent));
+        check("the focus stays on it", cardId() === DVD_RESUME, cardId());
       });
     },
 
@@ -710,7 +776,7 @@
         return until(function () { return doc().querySelector(".card:focus"); }, "the catalog");
       }).then(function () {
         check("the address is stored", localStorage.getItem("streamiso.server") === location.origin, localStorage.getItem("streamiso.server"));
-        return pressAll(["up", "up", "up", "enter"]);
+        return pressAll(["up", "up", "up", "right", "enter"]);  // the eye button, then Settings
       }).then(function () {
         return until(function () { return shown("settings"); }, "settings from the catalog");
       }).then(function () {

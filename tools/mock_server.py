@@ -75,7 +75,12 @@ state = {}
 log = []
 
 
+RESUME = {d["id"]: d["resume"] for d in DISCS}  # what reset() puts back after a test forgets a position
+
+
 def reset():
+    for d in DISCS:
+        d["resume"] = RESUME[d["id"]]
     state.clear()
     state.update({"disc": None, "resume": False, "opened_at": 0, "started": False, "paused": True, "time": 0.0,
                   "tick": time.time(), "volume": 80, "track": 0, "in_menu": True, "api_down": False,
@@ -300,6 +305,14 @@ class Handler(BaseHTTPRequestHandler):
                               "paused": True, "time": 0.0, "track": 0, "in_menu": True, "tick": time.time()})
                 log.append({"action": "play", "value": {"id": disc["id"], "resume": bool(body.get("resume"))}})
                 self.send_json(200, {"player_url": "/player", "title": disc["title"], "kind": disc["kind"]})
+            elif re.match(r"^/api/disc/[^/]+/resume/clear$", path):
+                disc = find(path.split("/")[3])
+                if not disc:
+                    self.send_json(404, {"error": "no such disc"})
+                    return
+                disc["resume"] = None
+                log.append({"action": "resume_clear", "value": disc["id"]})
+                self.send_json(200, {"ok": True})
             elif path == "/api/stop":
                 state.update({"disc": None, "started": False})
                 log.append({"action": "stop", "value": None})

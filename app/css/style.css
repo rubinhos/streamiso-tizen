@@ -33,6 +33,11 @@ h2 { margin: 0 0 12px; font-size: 40px; font-weight: 600; }
 /* Catalog */
 #catalog-head { position: absolute; left: 0; top: 0; width: 1920px; height: 200px; padding: 28px 70px; display: flex; align-items: flex-start; background: #0c0f13; z-index: 2; }
 #detail { flex: 1; min-width: 0; margin: 0 50px; }
+#catalog-seen { display: flex; align-items: center; margin-right: 20px; }
+#catalog-seen svg { width: 40px; height: 40px; margin-right: 12px; fill: currentColor; }
+/* the eye is open while watched discs are hidden and can be shown, crossed out while they are shown */
+#catalog-seen .eye-off, #catalog-seen[aria-pressed="true"] .eye { display: none; }
+#catalog-seen[aria-pressed="true"] .eye-off { display: block; }
 #detail-title { font-size: 42px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #detail-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #detail-text { font-size: 25px; max-height: 68px; overflow: hidden; }

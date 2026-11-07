@@ -1,5 +1,6 @@
-// The library: a grid of covers, DVDs first and then CDs. The discs of a TV season, or of a film on several
-// discs, form one card, which opens a view with those discs.
+// The library: a grid of covers, the discs in progress first, then DVDs and then CDs. The discs of a TV season,
+// or of a film on several discs, form one card, which opens a view with those discs. Discs already watched or
+// listened to are hidden until the eye button in the header shows them, as on the web page.
 (function (S) {
   "use strict";
 
@@ -9,6 +10,9 @@
   var gridScroll = 0;         // where the full grid was scrolled when the season opened
   var observer = null;
   var onOpen = null, onSettings = null;
+  var SEEN_KEY = "streamiso.showSeen";
+  var showSeen = false;       // also list the discs already watched / listened to
+  try { showSeen = localStorage.getItem(SEEN_KEY) === "1"; } catch (e) { /* storage is optional */ }
 
   // ---------------------------------------------------------------- seasons
   // Season and disc numbers written in a title, e.g. "Friends S01 D02", "Lost - Season 2 Disc 3", "Dexter T1
@@ -211,7 +215,12 @@
       text: "You stopped at " + S.formatTime(disc.resume.time) + ".",
       buttons: [
         { label: "Continue", action: function () { onOpen(disc, true); } },
-        { label: "Start over", action: function () { onOpen(disc, false); } }
+        { label: "Start over", action: function () { onOpen(disc, false); } },
+        // leaves "Continue watching"; the catalog reloads with the focus on the disc in its own section
+        { label: "Remove from Continue", action: function () {
+          lastId = disc.id;
+          S.api.clearResume(disc.id).then(S.catalog.show, S.catalog.show);
+        } }
       ],
       onBack: function () {}
     });
@@ -239,8 +248,60 @@
     Array.prototype.forEach.call(list.querySelectorAll("img[data-src]"), function (img) { observer.observe(img); });
   }
 
+  // Hidden by the eye button: a disc already watched / listened to, or a group whose discs all are.
+  function seenHidden(item) {
+    if (showSeen) return false;
+    return item.discs ? item.discs.every(function (d) { return d.watched; }) : !!item.watched;
+  }
+
+  // The eye button's words: "watched" for DVDs, "listened" for CDs, "played" for a mix.
+  function seenLabel() {
+    var hasCd = false, hasDvd = false;
+    (data ? data.discs : []).forEach(function (d) { if (d.kind === "cd") hasCd = true; else hasDvd = true; });
+    var word = hasCd && !hasDvd ? "listened" : hasCd ? "played" : "watched";
+    var btn = S.$("catalog-seen");
+    btn.querySelector(".lbl").textContent = (showSeen ? "Hide " : "Show ") + word;
+    btn.setAttribute("aria-pressed", showSeen ? "true" : "false");
+  }
+
+  function toggleSeen() {
+    showSeen = !showSeen;
+    try { localStorage.setItem(SEEN_KEY, showSeen ? "1" : "0"); } catch (e) { /* lasts until the app closes */ }
+    if (!data) return;
+    render();
+    S.focus.focus(S.$("catalog-seen"));  // the focus stays on the button, to press it again
+  }
+
+  // The library: discs in progress first, in a section of their own (even when already watched; one of a season
+  // also stays in its season's card), then the DVDs and the CDs that are not hidden.
+  function renderLibrary(list) {
+    var discs = data.discs;
+    var progress = discs.filter(function (d) { return d.resume; });
+    var grouped = {};
+    collapse(discs).forEach(function (it) {
+      if (it.discs) it.discs.forEach(function (d) { grouped[d.id] = true; });
+    });
+    var rest = discs.filter(function (d) { return !d.resume || grouped[d.id]; });
+    var onlyCd = progress.every(function (d) { return d.kind === "cd"; });
+    var anyCd = progress.some(function (d) { return d.kind === "cd"; });
+    addSection(list, onlyCd ? "Continue listening" : anyCd ? "Continue" : "Continue watching", progress, data.playing);
+    var hidden = 0;
+    [["DVDs", function (d) { return d.kind !== "cd"; }], ["Music CDs", function (d) { return d.kind === "cd"; }]].forEach(function (s) {
+      var items = collapse(rest.filter(s[1]));
+      var visible = items.filter(function (it) { return !seenHidden(it); });
+      hidden += items.length - visible.length;
+      addSection(list, s[0], visible, data.playing);
+    });
+    if (discs.length && !list.querySelector(".card")) {
+      list.appendChild(element("div", "empty", hidden
+        ? "Everything here has been played already. Press the eye button above to show it."
+        : "No discs found. Add images to the media folders on the server."));
+    }
+  }
+
   // The whole library, or the open season's discs.
   function render() {
+    seenLabel();
     var list = S.$("catalog-list");
     list.innerHTML = "";
     var season = openKey ? seasonDiscs(openKey) : [];
@@ -251,8 +312,7 @@
       addSection(list, groupHeading(s), season, data.playing);
       again = lastId && list.querySelector(selector("data-id", lastId));
     } else {
-      addSection(list, "DVDs", collapse(data.discs.filter(function (d) { return d.kind !== "cd"; })), data.playing);
-      addSection(list, "Music CDs", data.discs.filter(function (d) { return d.kind === "cd"; }), data.playing);
+      renderLibrary(list);
       if (lastId) {
         again = list.querySelector(selector("data-id", lastId)) || list.querySelector(selector("data-group", lastId));
         // a disc that is now inside a season's card
@@ -263,10 +323,12 @@
     }
     if (!data.discs.length) {
       list.appendChild(element("div", "empty", "No discs found. Add images to the media folders on the server."));
+    }
+    if (!list.querySelector(".card")) {
       ["detail-title", "detail-meta", "detail-text"].forEach(function (id) { S.$(id).textContent = ""; });
     }
     loadCovers(list);
-    S.focus.setScope(S.$("catalog"), again || list.querySelector(".card") || S.$("catalog-settings"));
+    S.focus.setScope(S.$("catalog"), again || list.querySelector(".card") || S.$("catalog-seen"));
   }
 
   function load(answer) {
@@ -309,6 +371,7 @@
       onOpen = handlers.open;
       onSettings = handlers.settings;
       S.$("catalog-settings").addEventListener("click", onSettings);
+      S.$("catalog-seen").addEventListener("click", toggleSeen);
     },
     show: function () {
       S.show("catalog");
@@ -317,6 +380,7 @@
     },
     seasonOf: seasonOf,
     isSeasonOpen: function () { return !!openKey; },
+    showsSeen: function () { return showSeen; },
     handleKey: function (name) {
       if (name === "back") {
         if (openKey) closeSeason();

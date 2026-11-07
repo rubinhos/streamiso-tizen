@@ -56,6 +56,8 @@
     coverUrl: function (disc) {
       return server + "/api/cover/" + encodeURIComponent(disc.id) + "?v=" + encodeURIComponent(disc.cover_v || "");
     },
+    // Forgets where a disc was left, so it leaves "Continue watching".
+    clearResume: function (id) { return request(server, "/api/disc/" + encodeURIComponent(id) + "/resume/clear", {}); },
     play: function (id, resume) { return request(server, "/api/play/" + encodeURIComponent(id), { resume: !!resume }); },
     player: function () { return request(server, "/api/player"); },
     status: function () { return request(server, "/api/player/status"); },
