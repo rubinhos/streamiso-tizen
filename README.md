@@ -15,6 +15,19 @@ running StreamISO server. To learn more about StreamISO itself, see [its reposit
 |---|---|
 | ![Catalog](docs/screenshots/catalog.jpg) | ![DVD controls](docs/screenshots/dvd-bar.jpg) |
 
+## Which TVs
+
+Samsung TVs from 2020 on (Tizen 5.5 or newer). The code is kept to what Chromium M69, the 2020 engine, understands, and
+the video route is chosen by what the engine can do, not by the model:
+
+| Model year | Tizen | Engine | Video route | Status |
+|---|---|---|---|---|
+| 2020 | 5.5 | Chromium M69 | Built-in client | Tested |
+| 2021 (for example AU8000) | 6.0 | Chromium M76 | Built-in client | Expected to work, not tested |
+| 2022 and later | 6.5+ | Chromium M85+ | Neko page in an iframe | Expected to work, not tested |
+
+Older TVs have not been tried.
+
 ## Installing
 
 ### Prerequisites
@@ -64,6 +77,11 @@ tizen install -n StreamISO.wgt -t YOUR_DEVICE_NAME
 ```
 
 If the install fails with error 1010, check the certificate.
+
+**More than one TV:** a Samsung certificate only works on the TVs it lists (by their DUID). For another TV, turn on its
+developer mode, connect it with `sdb connect`, and in **Certificate Manager** create a new profile, or edit the
+distributor certificate of the one you have, with that TV connected so its DUID is added. Then package again and install
+with that TV's device name.
 
 ### 6. Open the app
 
