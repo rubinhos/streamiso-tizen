@@ -172,6 +172,8 @@ def command(action, value):
         state["time"] = 0.0
     elif action == "nav" and value == "activate":
         state["in_menu"] = False
+    elif action == "return":
+        state["in_menu"] = True
     elif action == "menu":
         state["in_menu"] = True
     elif action not in ("chapter_next", "chapter_prev", "track_prev", "audio", "subtitle", "nav"):

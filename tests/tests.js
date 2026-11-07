@@ -66,7 +66,8 @@
   // them, so they are shown otherwise.
   function loadApp(server, showSeen) {
     localStorage.setItem("streamiso.server", server === undefined ? location.origin : server);
-    localStorage.setItem("streamiso.showSeen", showSeen === false ? "0" : "1");
+    localStorage.removeItem("streamiso.showSeen");
+    localStorage.setItem("streamiso.hideSeen", showSeen === false ? "1" : "0");
     return new Promise(function (resolve) {
       frame.onload = resolve;
       frame.src = "/app/index.html?" + Date.now();
@@ -177,18 +178,18 @@
         check("listened CDs are hidden", !discCard(CD_PLAIN));
         check("a season in progress keeps its card", inSection(1).indexOf("group") >= 0 && !discCard(SEASON_D1), inSection(1));
         var eye = $("catalog-seen");
-        check("the eye button offers to show them", /Show played/.test(eye.textContent) && eye.getAttribute("aria-pressed") === "false",
+        check("the Hide switch is on", /Hide played/.test(eye.textContent) && eye.getAttribute("aria-pressed") === "true",
           eye.textContent.trim());
         S().focus.focus(eye);
         return press("enter");
       }).then(function () {
         check("the eye button shows them", !!discCard(DVD_PLAIN) && !!discCard(CD_PLAIN) && !!discCard(OTHER_SEASON));
         check("the eye button keeps the focus", active().id === "catalog-seen", active().id);
-        check("it now offers to hide them", /Hide played/.test($("catalog-seen").textContent));
-        check("the choice is kept", localStorage.getItem("streamiso.showSeen") === "1" && S().catalog.showsSeen());
+        check("the switch is now off", $("catalog-seen").getAttribute("aria-pressed") === "false");
+        check("the choice is kept", localStorage.getItem("streamiso.hideSeen") === "0" && S().catalog.showsSeen());
         return press("enter");
       }).then(function () {
-        check("and hides them again", !discCard(DVD_PLAIN) && localStorage.getItem("streamiso.showSeen") === "0");
+        check("and hides them again", !discCard(DVD_PLAIN) && localStorage.getItem("streamiso.hideSeen") === "1");
       });
     },
 
@@ -402,7 +403,24 @@
       }).then(actions).then(function (log) {
         check("DVD menu button sends menu", hasAction(log, "menu"), log);
         check("the bar closes so arrows work in the menu", !shown("bar"));
+        return post("/api/player/cmd", { action: "nav", value: "activate" });  // from the menu into the film
+      }).then(function () {
+        return sleep(1500);  // the status says it is a film
+      }).then(clearLog).then(function () {
         return press("back");
+      }).then(actions).then(function (log) {
+        check("in a film, Back is Return", hasAction(log, "return") && !shown("bar"), log);
+        return post("/api/player/cmd", { action: "nav", value: "activate" });
+      }).then(function () {
+        return sleep(1500);
+      }).then(function () {
+        return press("info");
+      }).then(clearLog).then(function () {
+        S().focus.focus(doc().querySelector('[data-act="back"]'));
+        return press("enter");
+      }).then(actions).then(function (log) {
+        check("the Return button sends return", hasAction(log, "return") && !shown("bar"), log);
+        return press("info");
       }).then(function () {
         S().focus.focus(doc().querySelector('[data-act="subs"]'));
         return press("enter");
@@ -514,11 +532,13 @@
       }).then(function () {
         check("in the film, Down opens the bar", shown("bar"));
         return press("back");
-      }).then(function () {
+      }).then(clearLog).then(function () {
         return press("back");
+      }).then(actions).then(function (log) {
+        check("in the film, Back is Return, not the bar", hasAction(log, "return") && !shown("bar"), log);
+        return post("/api/player/cmd", { action: "nav", value: "activate" });  // from that menu into the film again
       }).then(function () {
-        check("in the film, Back opens the bar", shown("bar"));
-        return press("back");
+        return sleep(1500);
       }).then(clearLog).then(function () {
         return pressAll(["left", "up"]);
       }).then(actions).then(function (log) {
@@ -555,7 +575,7 @@
       }).then(function () {
         return sleep(1200);
       }).then(function () {
-        return press("back");  // a DVD starts with the bar closed
+        return press("info");  // a DVD starts with the bar closed (Back would be Return in the film)
       }).then(function () {
         return press("up");
       }).then(function () {

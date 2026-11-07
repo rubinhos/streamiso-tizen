@@ -10,9 +10,11 @@
   var gridScroll = 0;         // where the full grid was scrolled when the season opened
   var observer = null;
   var onOpen = null, onSettings = null;
-  var SEEN_KEY = "streamiso.showSeen";
+  // The "Hide watched" switch, on unless turned off. (It replaced "streamiso.showSeen", which is ignored, so
+  // every TV starts with it on.)
+  var SEEN_KEY = "streamiso.hideSeen";
   var showSeen = false;       // also list the discs already watched / listened to
-  try { showSeen = localStorage.getItem(SEEN_KEY) === "1"; } catch (e) { /* storage is optional */ }
+  try { showSeen = localStorage.getItem(SEEN_KEY) === "0"; } catch (e) { /* storage is optional */ }
 
   // ---------------------------------------------------------------- seasons
   // Season and disc numbers written in a title, e.g. "Friends S01 D02", "Lost - Season 2 Disc 3", "Dexter T1
@@ -260,13 +262,13 @@
     (data ? data.discs : []).forEach(function (d) { if (d.kind === "cd") hasCd = true; else hasDvd = true; });
     var word = hasCd && !hasDvd ? "listened" : hasCd ? "played" : "watched";
     var btn = S.$("catalog-seen");
-    btn.querySelector(".lbl").textContent = (showSeen ? "Hide " : "Show ") + word;
-    btn.setAttribute("aria-pressed", showSeen ? "true" : "false");
+    btn.querySelector(".lbl").textContent = "Hide " + word;  // a switch, on while they are hidden
+    btn.setAttribute("aria-pressed", showSeen ? "false" : "true");
   }
 
   function toggleSeen() {
     showSeen = !showSeen;
-    try { localStorage.setItem(SEEN_KEY, showSeen ? "1" : "0"); } catch (e) { /* lasts until the app closes */ }
+    try { localStorage.setItem(SEEN_KEY, showSeen ? "0" : "1"); } catch (e) { /* lasts until the app closes */ }
     if (!data) return;
     render();
     S.focus.focus(S.$("catalog-seen"));  // the focus stays on the button, to press it again

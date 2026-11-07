@@ -24,14 +24,17 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 | A season's discs | Move and open | Return to the catalog |
 | Settings | Move, OK to type | Return to the catalog |
 | DVD menu, bar closed | Go to the disc's menu | Open the bar |
-| DVD film, bar closed | Up and Down open the bar. Left, Right and OK go to the disc | Open the bar |
+| DVD film, bar closed | Up and Down open the bar. Left, Right and OK go to the disc | Return: the menu of what is playing |
 | DVD, bar open | Move between the controls | Close the bar |
 | CD | Move through the tracks and controls | Return to the catalog |
 
 - The discs of a TV season (`Show S02 D1`, or a season set in StreamISO's editor) form one card, as on StreamISO's web
   page. OK opens the season's discs in disc order. Leaving a disc returns to its season.
-- A DVD starts with the bar closed, so it never covers the disc's own menu. Back or Info open it (and Up or Down during a
-  film). The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu again.
+- A DVD starts with the bar closed, so it never covers the disc's own menu. Info opens it, and so do Up or Down during a
+  film and Back in a menu. The bar closes by itself after 6 seconds, and then the arrows go to the disc's menu again.
+- **Return** (Back during a film, or the Return button in the bar) asks StreamISO for the Root menu of the part of the
+  disc that is playing, as the Menu key of a DVD remote does. The disc decides which menu that is: often the one the
+  film or extra was started from, sometimes the main menu. **DVD menu** goes to the disc's main menu.
 - A menu is recognized by title 0, no duration, or a duration under 5 minutes. Real menus report a duration, so that alone
   is not enough. For 5 seconds after using the disc (any arrow or OK), Up and Down stay with it even in what looks like a film.
 - The back arrow in the bar, or Stop, leaves a DVD.

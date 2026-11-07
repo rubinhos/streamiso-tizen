@@ -1,7 +1,9 @@
 // The player. The same keys do different things depending on what is on screen:
 //   DVD starting:    the bar stays closed, so nothing covers the disc's own menu. Back or Info open it.
 //   DVD, bar closed: Left, Right and OK always go to the disc through the API. Up and Down go to it in a menu,
-//                    and open the bar during a film. Back or Info always open the bar.
+//                    and open the bar during a film. During a film Back is Return, the Menu key of a DVD remote:
+//                    back to the menu of what is playing. In a menu Back opens the bar (a remote without an Info
+//                    key has no other way to it there), and Info always does.
 //   DVD, bar open:   arrows move between the buttons. Back closes it, and so do a few seconds without a key.
 //   CD:              there is no video menu, so arrows move through the track list and the buttons.
 //                    Back leaves the player.
@@ -42,10 +44,19 @@
   // Up and Down open the bar during a film, but a disc's menu needs them. On real discs a menu reports title 0
   // and a duration of seconds to a few minutes, so a short title counts as a menu, as it does for StreamISO's
   // resume. A menu may still look like a film, so these keys also stay with the disc right after using it.
-  function upDownGoToDisc() {
+  function inMenu() {
     var st = session.status;
-    if (!st || !st.length || st.title === 0 || st.length < MENU_MAX_SECONDS) return true;
-    return Date.now() - session.lastNav < config.navWindowMs;
+    return !st || !st.length || st.title === 0 || st.length < MENU_MAX_SECONDS;
+  }
+  function upDownGoToDisc() {
+    return inMenu() || Date.now() - session.lastNav < config.navWindowMs;
+  }
+  // Return: the Root menu of the part of the disc that is playing, where the disc's author sends the Menu key of
+  // a DVD remote, often the menu the film or extra was started from.
+  function sendReturn() {
+    session.lastNav = Date.now();  // the menu it opens needs Up and Down
+    fire("return");
+    osd("Return");
   }
   function sendNav(value) {
     session.lastNav = Date.now();
@@ -191,6 +202,8 @@
     audio: function (button) { openPop(button, "Audio", session.status && session.status.audio, "audio"); },
     subs: function (button) { openPop(button, "Subtitles", session.status && session.status.subtitles, "subtitle"); },
     menu: function () { fire("menu"); closeBar(); },
+    // the menu of the part that is playing, as the Menu key of a DVD remote: often the one it was started from
+    back: function () { closeBar(); sendReturn(); },
     leave: function () { leave(); }
   };
 
@@ -512,7 +525,8 @@
         return;
       }
       if (!session.barOpen) {
-        if (name === "back" || name === "info") openBar();
+        if (name === "info" || (name === "back" && inMenu())) openBar();
+        else if (name === "back") sendReturn();
         else if (name === "enter") sendNav("activate");
         else if (name === "left" || name === "right") sendNav(name);
         else if (name === "up" || name === "down") {
