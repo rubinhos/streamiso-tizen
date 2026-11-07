@@ -124,6 +124,7 @@
     var img = document.createElement("img");
     img.alt = "";
     img.setAttribute("data-src", S.api.coverUrl(disc));
+    if (disc.cover_fill) img.className = "fill";  // cropped to fill the space, as set in the editor
     cover.appendChild(img);
     cover.appendChild(element("span", "tag", disc.kind === "cd" ? "CD" : "DVD"));
     if (disc.watched) cover.appendChild(element("span", "seen", disc.kind === "cd" ? "Listened" : "Watched"));
@@ -162,6 +163,7 @@
     var img = document.createElement("img");
     img.alt = "";
     img.setAttribute("data-src", S.api.coverUrl(first));
+    if (first.cover_fill) img.className = "fill";
     cover.appendChild(img);
     cover.appendChild(element("span", "tag", g.discs.length + " discs"));
     if (watched) cover.appendChild(element("span", "seen", "Watched"));
