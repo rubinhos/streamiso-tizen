@@ -262,7 +262,8 @@
     (data ? data.discs : []).forEach(function (d) { if (d.kind === "cd") hasCd = true; else hasDvd = true; });
     var word = hasCd && !hasDvd ? "listened" : hasCd ? "played" : "watched";
     var btn = S.$("catalog-seen");
-    btn.querySelector(".lbl").textContent = "Hide " + word;  // a switch, on while they are hidden
+    // says what is on screen: "Hide watched" (on) while they are hidden, "Show watched" while shown
+    btn.querySelector(".lbl").textContent = (showSeen ? "Show " : "Hide ") + word;
     btn.setAttribute("aria-pressed", showSeen ? "false" : "true");
   }
 

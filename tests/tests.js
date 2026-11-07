@@ -185,7 +185,7 @@
       }).then(function () {
         check("the eye button shows them", !!discCard(DVD_PLAIN) && !!discCard(CD_PLAIN) && !!discCard(OTHER_SEASON));
         check("the eye button keeps the focus", active().id === "catalog-seen", active().id);
-        check("the switch is now off", $("catalog-seen").getAttribute("aria-pressed") === "false");
+        check("the switch is now off and says Show", $("catalog-seen").getAttribute("aria-pressed") === "false" && /Show played/.test($("catalog-seen").textContent), $("catalog-seen").textContent.trim());
         check("the choice is kept", localStorage.getItem("streamiso.hideSeen") === "0" && S().catalog.showsSeen());
         return press("enter");
       }).then(function () {
