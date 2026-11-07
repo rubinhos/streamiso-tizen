@@ -1,5 +1,5 @@
-// The library: a grid of covers, DVDs first and then CDs. The discs of a TV season form one card, which opens a
-// view with that season's discs.
+// The library: a grid of covers, DVDs first and then CDs. The discs of a TV season, or of a film on several
+// discs, form one card, which opens a view with those discs.
 (function (S) {
   "use strict";
 
@@ -12,10 +12,13 @@
 
   // ---------------------------------------------------------------- seasons
   // Season and disc numbers written in a title, e.g. "Friends S01 D02", "Lost - Season 2 Disc 3", "Dexter T1
-  // Disco 4". The series name is what comes before the season. Keep SEASON_RE, DISC_RE and seasonOf() in step
-  // with catalog/static/app.js in the StreamISO repository, so the TV groups discs as the web page does.
+  // Disco 4". The series name is what comes before the season. Keep SEASON_RE, DISC_RE, FILM_DISC_RE and
+  // seasonOf() in step with catalog/static/app.js in the StreamISO repository, so the TV groups discs as the web
+  // page does.
   var SEASON_RE = /(?:^|[\s\-\u2013:,(])(?:season|temporada|saison|staffel|s|t)\s*0*(\d{1,3})(?=$|[\s\-\u2013:,)]|d(?:is[ck]o?)?\s*\d|e\d)/i;
   var DISC_RE = /(?:^|[\s\-\u2013:,(\d])(?:dis[ck]o?|dvd|d)\s*0*(\d{1,3})(?=$|[^\d])/i;
+  // Disc number of a film on several discs, e.g. "Titanic Disc 2", "Ben-Hur D2", "Gandhi (Disco 1 de 2)".
+  var FILM_DISC_RE = /(?:^|[\s\-\u2013:,(\[])(?:dis[ck]o?|dvd|cd|d)\s*0*(\d{1,2})(?=$|[\s\-\u2013:,)\]]|\s*(?:of|de|\/)\s*\d)/i;
 
   function given(v) { return v !== null && v !== undefined; }
 
@@ -28,20 +31,42 @@
     return { name: name, season: Number(m[1]), disc: dm ? Number(dm[1]) : null };
   }
 
+  function parseFilmDisc(title) {
+    var t = String(title || "");
+    var m = FILM_DISC_RE.exec(t);
+    if (!m) return null;
+    var name = t.slice(0, m.index).replace(/[\s\-\u2013:,(\[]+$/, "").trim();
+    return name ? { name: name, disc: Number(m[1]) } : null;
+  }
+
   // The season a DVD belongs to, from its edited season, its title, or (when the title says nothing) its file
-  // name or volume label; null if none. Discs matched to a TV series on TMDB are grouped by that series, so a
-  // revival with the same name as the original stays apart from it.
+  // name or volume label. Discs matched to a TV series on TMDB are grouped by that series, so a revival with the
+  // same name as the original stays apart from it. Without a season, a DVD with a disc number (edited, or
+  // "Titanic Disc 2" in its title, file name or label) is a film on several discs: season is null and the discs
+  // of the same film name form one group. Otherwise null.
   function seasonOf(d) {
     if (d.kind === "cd") return null;
     var fromTitle = parseTitle(d.title);
     var file = String(d.rel || "").replace(/^.*\//, "").replace(/\.[^.]*$/, "").replace(/[_.]+/g, " ");
-    var p = fromTitle || parseTitle(file) || parseTitle(String(d.label || "").replace(/[_.]+/g, " ")) || {};
+    var label = String(d.label || "").replace(/[_.]+/g, " ");
+    var p = fromTitle || parseTitle(file) || parseTitle(label) || {};
     var name = (fromTitle && fromTitle.name) || d.title;
     var season = given(d.season) ? d.season : p.season;
-    if (!name || !given(season)) return null;
+    if (!name) return null;
+    if (!given(season)) {
+      var film = parseFilmDisc(d.title);
+      var f = film || parseFilmDisc(file) || parseFilmDisc(label) || {};
+      var disc = given(d.disc) ? d.disc : f.disc;
+      if (!given(disc)) return null;
+      name = (film && film.name) || d.title;
+      return { key: "film:" + name.toLowerCase(), name: name, season: null, disc: disc };
+    }
     var series = d.tmdb_series ? "tmdb:" + d.tmdb_series : name.toLowerCase();
     return { key: series + "|" + season, name: name, season: season, disc: given(d.disc) ? d.disc : p.disc };
   }
+
+  // "Friends – Season 2", or just the name of a film on several discs.
+  function groupHeading(s) { return s.season === null ? s.name : s.name + " – Season " + s.season; }
 
   function byDiscNumber(a, b) {
     var da = seasonOf(a).disc, db = seasonOf(b).disc;
@@ -143,7 +168,8 @@
     card.appendChild(cover);
     card.appendChild(element("span", "card-title", g.name));
     var number = resumed && seasonOf(resumed).disc;
-    var note = open ? "Now open" : resumed ? "Continue" + (given(number) ? " disc " + number : "") : "Season " + g.season;
+    var note = open ? "Now open" : resumed ? "Continue" + (given(number) ? " disc " + number : "")
+      : g.season === null ? (first.year ? String(first.year) : "") : "Season " + g.season;
     card.appendChild(element("span", "card-resume", note));
 
     card.addEventListener("click", function () { openSeason(g.key); });
@@ -155,7 +181,7 @@
     lastId = g.key;
     var first = g.discs[0];
     var seen = g.discs.filter(function (d) { return d.watched; }).length;
-    S.$("detail-title").textContent = g.name + " – Season " + g.season;
+    S.$("detail-title").textContent = groupHeading(g);
     var meta = [];
     if (first.year) meta.push(first.year);
     meta.push(g.discs.length + " discs" + (seen && seen < g.discs.length ? ", " + seen + " watched" : ""));
@@ -220,7 +246,7 @@
     var again = null;
     if (openKey) {
       var s = seasonOf(season[0]);
-      addSection(list, s.name + " – Season " + s.season, season, data.playing);
+      addSection(list, groupHeading(s), season, data.playing);
       again = lastId && list.querySelector(selector("data-id", lastId));
     } else {
       addSection(list, "DVDs", collapse(data.discs.filter(function (d) { return d.kind !== "cd"; })), data.playing);

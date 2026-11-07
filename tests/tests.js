@@ -160,6 +160,10 @@
         check("a season in the title", JSON.stringify(parsed("Lost - Season 2 Disc 3")) === '["Lost",2,3]', parsed("Lost - Season 2 Disc 3"));
         check("S01 D02 in the title", JSON.stringify(parsed("Friends S01 D02")) === '["Friends",1,2]', parsed("Friends S01 D02"));
         check("a title without a season", parsed("Moonlit Marmalade") === null);
+        check("a film on several discs", JSON.stringify(parsed("Titanic Disc 2")) === '["Titanic",null,2]', parsed("Titanic Disc 2"));
+        check("a film's disc in Portuguese", JSON.stringify(parsed("Gandhi (Disco 1 de 2)")) === '["Gandhi",null,1]', parsed("Gandhi (Disco 1 de 2)"));
+        check("a number in a film's name is not a disc", parsed("District 9") === null && parsed("Avatar 3D") === null);
+        check("an edited disc with a plain title is a film's disc", seasonOf({ kind: "dvd", title: "Titanic", disc: 1 }).key === "film:titanic");
         check("an edited season with a plain title", seasonOf({ kind: "dvd", title: "Show", season: 3 }).key === "show|3");
         check("a TMDB series id groups apart from the name",
           seasonOf({ kind: "dvd", title: "Show", season: 1, tmdb_series: 42 }).key === "tmdb:42|1");
