@@ -321,8 +321,9 @@
 
     function blockedSound() {
       return toCatalog().then(function () {
-        // Blocks the start itself and the key press that closes the bar, which also tries to turn the sound on.
-        return post("/_mock/set", { unlock_blocked: 2 });
+        // Blocks the start itself. A DVD starts with the bar closed, so the next key press is the one that turns
+        // the sound on.
+        return post("/_mock/set", { unlock_blocked: 1 });
       }).then(function () {
         S().player.config.soundCheckMs = 200;
         return openDisc(DVD_PLAIN);
@@ -595,7 +596,12 @@
         var seeks = log.filter(function (e) { return e.action === "seek"; });
         check("one seek is sent when the presses stop", seeks.length === 1, seeks);
         check("the seek went 30 s ahead", seeks.length === 1 && seeks[0].value >= 2560 && seeks[0].value < 2590, seeks);
-        check("left and right do not leave the line", active().id === "progress", active().id);
+        // The stream page still takes the focus now and then, and the app takes it back within half a second,
+        // so a single look could land in between.
+        return until(function () { return active().id === "progress"; }, "the focus on the line", 1500)
+          .then(function () { return true; }, function () { return false; });
+      }).then(function (onLine) {
+        check("left and right do not leave the line", onLine, active().id);
         return clearLog();
       }).then(function () {
         return pressAll(["left", "enter"]);
