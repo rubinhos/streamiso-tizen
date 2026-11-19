@@ -73,7 +73,7 @@ The focus stays in the app, which takes it back whenever the stream's page asks 
 ## Tested and not tested
 
 **Tested on a PC (Edge), against the simulated server:** focus movement, the rule for each key, the opening order
-(`resume_apply`, then `start`), the errors and the first launch. Real key presses were used too.
+(`resume_apply`, then `start`), the errors and the first launch, the second address, the API key and reconnecting a stream that stops. Real key presses were used too, and GitHub Actions runs the same tests in a headless Chrome.
 
 **Tested against a real Neko, from a PC:** both video routes connect and deliver the picture.
 
@@ -89,6 +89,9 @@ The focus stays in the app, which takes it back whenever the stream's page asks 
 7. **Typing the address:** does the keyboard open with OK, and does the focus return when you finish or cancel?
 8. **Screen saver:** leave a disc playing for longer than it takes to start.
 9. **Home button during a film:** it should pause. See what happens when you return.
+10. **The new Settings fields:** typing the second address and the API key, and whether the two columns fit the screen.
+11. **Reconnecting:** turn the server's network off for a moment during a film. The picture should come back without
+    the disc starting over.
 
 
 **Seen on a 2020 TV (Tizen 5.5, Chromium M69):** the app installs and opens, and opens a disc on a real server. Its engine has
