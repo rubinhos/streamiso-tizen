@@ -15,6 +15,8 @@ docker run --rm -p 8090:8090 -p 8091:8091 -v "$PWD:/repo:ro" python:3.12-slim py
 
 - **App:** <http://localhost:8090/app/>, with `localhost:8090` as the server's address.
 - **Tests:** <http://localhost:8090/tests/>. They press keys in the real app, and check the focus and the commands sent.
+  `node tools/ci_tests.mjs /path/to/chrome` runs them headless and fails if any test fails, as GitHub Actions does on
+  every push and pull request.
 
 ## The remote
 
@@ -61,10 +63,10 @@ needs CORS on Neko. Without the answer the client falls back to Neko's older soc
 testing. If you need it, in the `neko` service of StreamISO's `docker-compose.yml`:
 
 ```yaml
-NEKO_SERVER_CORS: "${CORS_ORIGIN:-}"
+NEKO_SERVER_CORS: "null"
 ```
 
-Pin `NEKO_IMAGE` to a release when using the built-in client, since it depends on Neko's protocol.
+StreamISO pins `NEKO_IMAGE` to a tested Neko release, which matters here: the built-in client depends on Neko's protocol.
 
 The focus stays in the app, which takes it back whenever the stream's page asks for it. DVD menu moves go to `POST /api/player/cmd`.
 
