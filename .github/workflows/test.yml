@@ -1,0 +1,35 @@
+# Runs tests/ in a headless Chrome against the simulated server (tools/mock_server.py) on every push and pull
+# request. Packaging for the TV needs Tizen Studio and a Samsung certificate, so it stays manual (see the README).
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: browser-actions/setup-chrome@v1
+        id: chrome
+
+      - name: Test against the simulated server
+        run: |
+          python tools/mock_server.py > mock.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8090/healthz > /dev/null && break; sleep 1; done
+          node tools/ci_tests.mjs "${{ steps.chrome.outputs.chrome-path }}"

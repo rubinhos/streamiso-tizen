@@ -8,6 +8,9 @@
 (function (S) {
   "use strict";
 
+  // How long a dropped network connection may take to come back before the player opens the stream again.
+  var DROP_GRACE_MS = 8000;
+
   function parses(code) {
     try { new Function(code); return true; } catch (e) { return false; }
   }
@@ -99,6 +102,14 @@
     var socketBase = base.replace(/^http/i, "ws");
     var closed = false, ws = null, pc = null, token = null, legacy = false, reported = null;
     var step = "signing in to Neko", variantAt = 0, errors = [], lastOffer = "", pendingCandidates = [];
+    var dropTimer = 0, gone = false;
+
+    // Once, when a stream that was working stops: the player then opens a new one.
+    function lost(reason) {
+      if (gone || closed) return;
+      gone = true;
+      if (events.onLost) events.onLost(reason);
+    }
 
     var video = document.createElement("video");
     video.autoplay = true;
@@ -132,7 +143,19 @@
         else send("signal/candidate", e.candidate.toJSON());
       };
       peer.oniceconnectionstatechange = function () {
-        step = "network: " + peer.iceConnectionState;
+        var state = peer.iceConnectionState;
+        step = "network: " + state;
+        clearTimeout(dropTimer);
+        if (closed || peer !== pc) return;
+        // "disconnected" often recovers by itself (a Wi-Fi hiccup); "failed" does not.
+        if (state === "failed") lost("the network connection to the video failed");
+        else if (state === "disconnected") {
+          dropTimer = setTimeout(function () {
+            if (!closed && peer === pc && peer.iceConnectionState !== "connected" && peer.iceConnectionState !== "completed") {
+              lost("the network connection to the video dropped");
+            }
+          }, DROP_GRACE_MS);
+        }
       };
       peer.ontrack = function (e) {
         // One stream for both tracks: assigning srcObject again would abort the pending play().
@@ -195,8 +218,10 @@
         step = "waiting for the offer";
         if (!legacy) send("signal/request", { video: {}, audio: {} });
       };
+      ws.onclose = function () { lost("the connection to Neko closed"); };
       ws.onmessage = function (e) {
-        var msg = JSON.parse(e.data);
+        var msg;
+        try { msg = JSON.parse(e.data); } catch (err) { return; /* not a message of Neko's */ }
         var data = legacy ? msg : (msg.payload || {});
         if (msg.event === "system/heartbeat") send("client/heartbeat", {});
         else if (msg.event === "signal/provide" || msg.event === "signal/offer") negotiate(data.sdp);
@@ -235,7 +260,8 @@
       close: function () {
         closed = true;
         clearInterval(audioTimer);
-        if (ws) { ws.onmessage = null; ws.close(); }
+        clearTimeout(dropTimer);
+        if (ws) { ws.onmessage = null; ws.onclose = null; ws.close(); }
         if (pc) pc.close();
         video.srcObject = null;
         if (video.parentNode) video.parentNode.removeChild(video);
