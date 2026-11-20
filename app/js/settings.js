@@ -12,7 +12,7 @@
   function input(id) { return S.$(id); }
 
   function diagnostics() {
-    var lines = ["App version  0.1.0", "Engine       " + navigator.userAgent];
+    var lines = ["App version  0.2.0", "Engine       " + navigator.userAgent];
     var mode = S.stream.mode();
     lines.push("WebRTC       " + (mode === "none" ? "not available in this engine" : "available"));
     lines.push("Video route  " + (mode === "iframe" ? "Neko page in an iframe" : mode === "client" ? "built-in Neko client" : "none"));
